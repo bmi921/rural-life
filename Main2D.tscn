@@ -9,6 +9,11 @@
 [node name="WorldTileMap" type="TileMap" parent="." unique_id=2131455355]
 format = 2
 
+[node name="Ground" type="TileMap" parent="." unique_id=202229967]
+rendering_quadrant_size = 32
+format = 2
+script = ExtResource("3_kgyop")
+
 [node name="Player" type="CharacterBody2D" parent="." unique_id=2066314245]
 script = ExtResource("1_feeyt")
 
@@ -20,8 +25,3 @@ script = ExtResource("1_feeyt")
 script = ExtResource("2_kgyop")
 
 [node name="UI" type="CanvasLayer" parent="." unique_id=1926895063]
-
-[node name="Ground" type="TileMap" parent="." unique_id=202229967]
-rendering_quadrant_size = 32
-format = 2
-script = ExtResource("3_kgyop")
