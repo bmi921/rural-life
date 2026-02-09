@@ -1,0 +1,27 @@
+[gd_scene format=3 uid="uid://chlsli0lpst3w"]
+
+[ext_resource type="Script" uid="uid://bmfevt26gw17h" path="res://scripts/player.gd" id="1_feeyt"]
+[ext_resource type="Script" uid="uid://dxleehqgumkh0" path="res://scripts/camera_iso.gd" id="2_kgyop"]
+[ext_resource type="Script" uid="uid://b85viaro7rbbx" path="res://scripts/ground_generator.gd" id="3_kgyop"]
+
+[node name="Main2D" type="Node2D" unique_id=1061416848]
+
+[node name="WorldTileMap" type="TileMap" parent="." unique_id=2131455355]
+format = 2
+
+[node name="Player" type="CharacterBody2D" parent="." unique_id=2066314245]
+script = ExtResource("1_feeyt")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Player" unique_id=1454803486]
+
+[node name="Sprite2D" type="Sprite2D" parent="Player" unique_id=619870103]
+
+[node name="Camera2D" type="Camera2D" parent="." unique_id=123899428]
+script = ExtResource("2_kgyop")
+
+[node name="UI" type="CanvasLayer" parent="." unique_id=1926895063]
+
+[node name="Ground" type="TileMap" parent="." unique_id=202229967]
+rendering_quadrant_size = 32
+format = 2
+script = ExtResource("3_kgyop")
