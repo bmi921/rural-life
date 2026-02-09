@@ -24,7 +24,7 @@ func _process(_delta: float) -> void:
 	
 	# ズームイン（+ キー） → 画面を近づける（zoom を小さく）
 	if InputMap.has_action("zoom_in") and Input.is_action_just_pressed("zoom_in"):
-		var z: float = clamp(zoom.x - zoom_step, min_zoom, max_zoom)
+		var z: float = clamp(zoom.x + zoom_step, min_zoom, max_zoom)
 		zoom = Vector2(z, z)
 		zoom_level = z
 	

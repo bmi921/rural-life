@@ -4,7 +4,14 @@ extends CharacterBody2D
 
 # 8方向の方向名
 var current_direction: String = "south"
-var direction_textures: Dictionary = {}
+var is_attacking: bool = false
+@onready var anim_sprite: AnimatedSprite2D = $AnimatedSprite2D
+
+# Jump variables
+var z_pos: float = 0.0
+var z_vel: float = 0.0
+const GRAVITY: float = 980.0
+const JUMP_FORCE: float = 300.0
 
 func _ready() -> void:
 	# 入力アクションを登録
@@ -20,74 +27,151 @@ func _ready() -> void:
 		shape.size = Vector2(32, 32)
 		cs.shape = shape
 	
-	# 8方向のテクスチャを読み込む
-	_load_direction_textures()
+	# アニメーション設定
+	_setup_animations()
 	
-	# 初期スプライトを設定
-	var sprite: Sprite2D = get_node_or_null("Sprite2D")
-	if sprite:
-		sprite.centered = true
-		_update_sprite_direction()
+	if anim_sprite:
+		# Centered is default for AnimatedSprite2D usually, but ensure it
+		anim_sprite.centered = true
+		_update_animation_state()
 
-func _load_direction_textures() -> void:
-	var directions: Array[String] = [
+func _setup_animations() -> void:
+	if not anim_sprite:
+		return
+		
+	var sprite_frames = SpriteFrames.new()
+	if sprite_frames.has_animation("default"):
+		sprite_frames.remove_animation("default")
+	
+	var directions = [
 		"south", "south-east", "east", "north-east",
 		"north", "north-west", "west", "south-west"
 	]
 	
+	# Load walk animations
 	for dir in directions:
-		var texture_path: String = "res://ordinary_young_man/rotations/" + dir + ".png"
-		var texture: Texture2D = load(texture_path)
-		if texture:
-			direction_textures[dir] = texture
-
-func _update_sprite_direction() -> void:
-	var sprite: Sprite2D = get_node_or_null("Sprite2D")
-	if sprite and direction_textures.has(current_direction):
-		sprite.texture = direction_textures[current_direction]
+		var anim_name = "walk_" + dir
+		sprite_frames.add_animation(anim_name)
+		sprite_frames.set_animation_loop(anim_name, true)
+		sprite_frames.set_animation_speed(anim_name, 10.0)
+		
+		var frame_index = 0
+		while true:
+			var frame_str = "frame_%03d" % frame_index
+			var path = "res://ordinary_young_man/animations/walk/" + dir + "/" + frame_str + ".png"
+			if not FileAccess.file_exists(path):
+				break
+			var texture = load(path)
+			if texture:
+				sprite_frames.add_frame(anim_name, texture)
+			frame_index += 1
+			if frame_index > 20: break
+			
+	# Load idle (use first frame of walk)
+	for dir in directions:
+		var anim_name = "idle_" + dir
+		sprite_frames.add_animation(anim_name)
+		var path = "res://ordinary_young_man/animations/walk/" + dir + "/frame_000.png"
+		if FileAccess.file_exists(path):
+			var texture = load(path)
+			sprite_frames.add_frame(anim_name, texture)
+			
+	# Load jump animations
+	for dir in directions:
+		var anim_name = "jump_" + dir
+		sprite_frames.add_animation(anim_name)
+		sprite_frames.set_animation_loop(anim_name, false) # Jump usually plays once
+		sprite_frames.set_animation_speed(anim_name, 10.0)
+		
+		var frame_index = 0
+		while true:
+			var frame_str = "frame_%03d" % frame_index
+			var path = "res://ordinary_young_man/animations/jumping-1/" + dir + "/" + frame_str + ".png"
+			if not FileAccess.file_exists(path):
+				break
+			var texture = load(path)
+			if texture:
+				sprite_frames.add_frame(anim_name, texture)
+			frame_index += 1
+			if frame_index > 20: break
+	
+	anim_sprite.sprite_frames = sprite_frames
 
 func _ensure_input_actions() -> void:
-	# move_up
+	# move_up, down, left, right (WASD + Arrows)
 	if not InputMap.has_action("move_up"):
 		InputMap.add_action("move_up")
-		var ev_w: InputEventKey = InputEventKey.new()
+		var ev_w = InputEventKey.new()
 		ev_w.keycode = KEY_W
 		InputMap.action_add_event("move_up", ev_w)
-		var ev_up: InputEventKey = InputEventKey.new()
+		var ev_up = InputEventKey.new()
 		ev_up.keycode = KEY_UP
 		InputMap.action_add_event("move_up", ev_up)
 	
-	# move_down
 	if not InputMap.has_action("move_down"):
 		InputMap.add_action("move_down")
-		var ev_s: InputEventKey = InputEventKey.new()
+		var ev_s = InputEventKey.new()
 		ev_s.keycode = KEY_S
 		InputMap.action_add_event("move_down", ev_s)
-		var ev_down: InputEventKey = InputEventKey.new()
+		var ev_down = InputEventKey.new()
 		ev_down.keycode = KEY_DOWN
 		InputMap.action_add_event("move_down", ev_down)
 	
-	# move_left
 	if not InputMap.has_action("move_left"):
 		InputMap.add_action("move_left")
-		var ev_a: InputEventKey = InputEventKey.new()
+		var ev_a = InputEventKey.new()
 		ev_a.keycode = KEY_A
 		InputMap.action_add_event("move_left", ev_a)
-		var ev_left: InputEventKey = InputEventKey.new()
+		var ev_left = InputEventKey.new()
 		ev_left.keycode = KEY_LEFT
 		InputMap.action_add_event("move_left", ev_left)
 	
-	# move_right
 	if not InputMap.has_action("move_right"):
 		InputMap.add_action("move_right")
-		var ev_d: InputEventKey = InputEventKey.new()
+		var ev_d = InputEventKey.new()
 		ev_d.keycode = KEY_D
 		InputMap.action_add_event("move_right", ev_d)
-		var ev_right: InputEventKey = InputEventKey.new()
+		var ev_right = InputEventKey.new()
 		ev_right.keycode = KEY_RIGHT
 		InputMap.action_add_event("move_right", ev_right)
+	
+	# attack (Space)
+	if not InputMap.has_action("attack"):
+		InputMap.add_action("attack")
+		var ev_space = InputEventKey.new()
+		ev_space.keycode = KEY_SPACE
+		InputMap.action_add_event("attack", ev_space)
+		
+	# jump (Z)
+	if not InputMap.has_action("jump"):
+		InputMap.add_action("jump")
+		var ev_z = InputEventKey.new()
+		ev_z.keycode = KEY_Z
+		InputMap.action_add_event("jump", ev_z)
 
 func _physics_process(_delta: float) -> void:
+	# Jump Physics
+	if z_pos < 0 or z_vel != 0:
+		z_vel += GRAVITY * _delta
+		z_pos += z_vel * _delta
+		if z_pos > 0:
+			z_pos = 0
+			z_vel = 0
+			
+	# Jump Input
+	if z_pos == 0 and InputMap.has_action("jump") and Input.is_action_just_pressed("jump"):
+		z_vel = -JUMP_FORCE
+	
+	if is_attacking:
+		_update_animation_state()
+		move_and_slide()
+		return
+
+	# Attack input
+	if InputMap.has_action("attack") and Input.is_action_just_pressed("attack"):
+		_attack()
+		return
+
 	# WASDで8方向移動
 	var input_vector: Vector2 = Vector2.ZERO
 	
@@ -112,6 +196,7 @@ func _physics_process(_delta: float) -> void:
 		velocity.x = 0.0
 		velocity.y = 0.0
 	
+	_update_animation_state()
 	move_and_slide()
 
 func _determine_direction(input_vector: Vector2) -> void:
@@ -119,37 +204,63 @@ func _determine_direction(input_vector: Vector2) -> void:
 	var x: float = input_vector.x
 	var y: float = input_vector.y
 	
-	# 入力ベクトルから直接方向を判定
-	# GodotではY軸は下が正なので、yが負なら上（north）、正なら下（south）
-	# xが負なら左（west）、正なら右（east）
-	
-	# まず斜め方向をチェック（閾値0.3で判定）
 	var threshold: float = 0.3
 	
 	if abs(x) > threshold and abs(y) > threshold:
-		# 斜め方向
 		if x > 0 and y < 0:
-			new_direction = "north-east"  # 右上
+			new_direction = "north-east"
 		elif x > 0 and y > 0:
-			new_direction = "south-east"  # 右下
+			new_direction = "south-east"
 		elif x < 0 and y < 0:
-			new_direction = "north-west"  # 左上
+			new_direction = "north-west"
 		elif x < 0 and y > 0:
-			new_direction = "south-west"  # 左下
+			new_direction = "south-west"
 	elif abs(x) > abs(y):
-		# 左右方向が優勢
 		if x > 0:
-			new_direction = "east"  # 右
+			new_direction = "east"
 		else:
-			new_direction = "west"  # 左
+			new_direction = "west"
 	else:
-		# 上下方向が優勢
 		if y < 0:
-			new_direction = "north"  # 上（Y軸は下が正なので、yが負なら上）
+			new_direction = "north"
 		else:
-			new_direction = "south"  # 下
+			new_direction = "south"
 	
-	# 方向が変わったらスプライトを更新
-	if new_direction != current_direction:
-		current_direction = new_direction
-		_update_sprite_direction()
+	current_direction = new_direction
+
+func _update_animation_state() -> void:
+	if not anim_sprite:
+		return
+		
+	# Update visual position based on z_pos
+	# Note: z_pos is negative upwards
+	anim_sprite.position.y = z_pos
+	
+	if z_pos < 0:
+		# Jumping
+		anim_sprite.play("jump_" + current_direction)
+		return
+		
+	if is_attacking:
+		anim_sprite.play("idle_" + current_direction)
+		return
+		
+	if velocity.length() > 0:
+		anim_sprite.play("walk_" + current_direction)
+	else:
+		anim_sprite.play("idle_" + current_direction)
+
+func _attack() -> void:
+	is_attacking = true
+	velocity = Vector2.ZERO
+	
+	# Visual feedback: Rotate sprite
+	if anim_sprite:
+		var tween = create_tween()
+		tween.tween_property(anim_sprite, "rotation_degrees", 30.0, 0.1)
+		tween.tween_property(anim_sprite, "rotation_degrees", -30.0, 0.1)
+		tween.tween_property(anim_sprite, "rotation_degrees", 0.0, 0.1)
+		tween.tween_callback(func(): is_attacking = false)
+	else:
+		await get_tree().create_timer(0.3).timeout
+		is_attacking = false
